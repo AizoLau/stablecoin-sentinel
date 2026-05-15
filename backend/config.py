@@ -38,8 +38,14 @@ class Settings(BaseSettings):
 
     # Demo wallets (testnet only)
     deployer_private_key: str = ""
+    deployer_address: str = ""
+    sentinel_private_key: str = ""
+    sentinel_address: str = ""
     demo_alice_private_key: str = ""
+    demo_alice_address: str = ""
     demo_bob_private_key: str = ""
+    demo_bob_address: str = ""
+    demo_recovery_private_key: str = ""
     demo_recovery_address: str = ""
 
     # Backend
