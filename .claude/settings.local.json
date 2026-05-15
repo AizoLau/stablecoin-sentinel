@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/c/Program Files/GreenProgramming/GreenPython/python.exe *)",
+      "Read(//c/Program Files/GreenProgramming//**)",
+      "Read(//c/ProgramData/Miniconda3/**)",
+      "Bash(/c/Program Files/GreenProgramming/GreenPython/python-3.12.2/python.exe *)",
+      "Bash(powershell *)",
+      "WebSearch",
+      "Bash(forge --version)",
+      "Bash(cast --version)",
+      "Bash(git --version)",
+      "Read(//c/Tools/foundry//**)",
+      "Bash(/c/Tools/foundry/forge.exe --version)",
+      "PowerShell(Test-Path *)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git -c user.email=aizolau0309@outlook.com -c user.name=Aizolau commit -q -m \"Initial: M1 scaffold \\(contracts + backend stubs + plan reference\\)\")"
+    ]
+  }
+}

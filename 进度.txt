@@ -1,0 +1,128 @@
+  比赛要求复核
+
+  competition-requirements.md 关键点：
+  - 提交清单要"Functional MVP + 架构图 + 视频 + GitHub + Demo URL + Circle Product Feedback 章节"
+  - "必须有可运行的 MVP，不是纸面方案"
+  - 没有要求覆盖宽度，没有任何条款说"系统越复杂越好"
+  - 赛道 4 官方示例本身都是单点应用（订阅续费 / pay-per-inference / 多对手方结算），没有"全栈合规平台"那种叙事
+
+  结论：小而精完全符合比赛偏好。评委是 Circle / Ignyte，他们要的是能跑得动、讲得清、用上 Circle 工具栈的真实
+  demo，不是一个"看上去像银行内部系统"的大架构。
+
+  ---
+  从我们 Section 3.2 矩阵里挑垂直组件 — 候选 5 个
+
+  按"小而不可或缺"标准筛选（=范围可控 + agentic 属性强 + 法规明确点名 + 现有工具薄弱 + 简历叙事好）：
+
+  候选 A：Unhosted Wallet Risk Sentinel（自托管钱包风险哨兵）
+
+  - 法规依据：Para 4.34, 4.39, 5.9-5.12, 6.40-6.42
+  - HKMA 原话："peer-to-peer transfers between unhosted wallets" 是最高 ML/TF 风险区，且 Para 5.11
+  明说"风险缓解措施的有效性尚未证实"——监管在等行业实践
+  - 痛点：Chainalysis / TRM Labs 给风险分，但不做"agent 自主决策 + 链上执行"
+  - 范围：监听 USDC 转账 → 识别 unhosted wallet → 多源风险评估 → 决策（放行/限额/拦截/隔离）→ Circle Wallets 链上执行 →
+  XAI 理由输出
+  - agentic 属性：★★★★★（自主拉数据 + 推理 + 执行）
+  - 不可或缺度：★★★★★（HKMA 点名最高风险 + 行业空白）
+
+  候选 B：Travel Rule Auto-Hold Middleware（旅行规则自动 hold 中间件）
+
+  - 法规依据：Ch 6（Para 6.5-6.24, 6.40-6.42）
+  - 痛点：HK$8,000 以上转账必须传 originator/recipient 全套信息，缺信息要 hold；持牌人最痛工程题之一
+  - 范围：识别转账金额 → 检查 IVMS 101 数据完整性 → 缺失自动 hold + 向对手方发请求 → 凑齐放行 / 超时退回
+  - agentic 属性：★★★（更偏管道）
+  - 不可或缺度：★★★★（合规硬需求，但 Notabene / Sumsub Travel 已有竞品）
+
+  候选 C：Counterparty VASP DD Agent（对手方 VASP 尽调 agent）
+
+  - 法规依据：Para 6.32-6.39（含 shell VASP 检测）
+  - 痛点：每接入一个新对手方机构都要做 AML/CFT 控制评估，目前靠人工或买静态报告
+  - 范围：输入对手方机构名 / 域名 / 钱包地址 → agent 爬取公开信息（监管牌照 / 负面新闻 / 在岸机构状态 / 区块链分析）→
+  自动生成尽调报告 + 风险评分 + shell VASP 判定
+  - agentic 属性：★★★★★（纯 LLM 调研 + 推理 + 报告）
+  - 不可或缺度：★★★（场景偏批处理，缺单笔交易紧迫感）
+  - 链上参与少：偏离 Circle Wallets / Gateway 主线
+
+  候选 D：XAI STR Co-pilot（可解释 STR 草稿副驾驶）
+
+  - 法规依据：Ch 8 + Para 5.7
+  - 痛点：MLRO 每月手工写大量 STR，质量参差；Para 5.7 要求决策书面化但缺工具
+  - 范围：可疑交易触发 → agent 拉取交易上下文 + 客户档案 + 链上证据 → 生成结构化 STR 草稿（含决策理由 + paragraph
+  引用）→ MLRO 一键修改提交
+  - agentic 属性：★★★（偏后处理 + 内容生成）
+  - 不可或缺度：★★★（痛点真实但偏 productivity，缺执行权）
+
+  候选 E：Sanctions Watch Auto-Updater（制裁名单自更新筛查管道）
+
+  - 法规依据：Para 7.2-7.5
+  - 痛点：UNSCR / 港府宪报 / HKMA 通知散落多处，发布即需历史回扫
+  - 范围：持续抓取多源名单 → 自动入库 → 历史交易 / 客户回扫 → 触发再筛 + 告警
+  - agentic 属性：★★（更像 ETL + 规则）
+  - 不可或缺度：★★★（合规刚需但偏基建）
+
+  ---
+  我的推荐：A — Unhosted Wallet Risk Sentinel
+
+  理由：
+
+  1. 比赛角度：完美命中赛道 4 "agent 自主执行链上交易"定义；用上 Circle Wallets（签名）+
+  Gateway（隔离路由），跟比赛技术栈深度绑定。
+  2. 法规角度：HKMA 文件 Para 5.11
+  罕见地承认"措施有效性尚未证实"——这是监管自己留的口子，等行业方案。我们做出来就是直接对标这个 gap。
+  3. 行业空白：Chainalysis 卖数据 + 风险分，但不做执行；MetaMask 等钱包做体验，但不做合规。"agent 决策执行层"是真空带。
+  4. 范围可控做小：
+    - 只做 USDC（一个 token）
+    - 只做 Arc testnet 或 Sepolia 一个链
+    - 只做"发行 / 赎回时涉及 unhosted wallet"一个场景
+    - 规则集只配 HKMA 一套（VARA 留扩展点不实现）
+    - Travel Rule、PEP、对手方 DD 都写进"未来扩展"section，不做
+  5. 简历叙事：可以一句话讲清楚——"HKMA 把 unhosted wallet 列为最高风险但留白技术指引，我做了执行型 agent 填补这个空白"。
+
+  对比次优 C（VASP DD Agent）：C 的 agentic 属性同样高，但缺链上执行成分，会让我们用 Circle 工具的故事讲不圆。Circle
+  是技术赞助方，评委首要看的是"你怎么用 Circle 工具"。
+
+  ---
+  待你拍板的几个问题
+
+  1. 选 A 还是别的候选？或者你心里有 F 选项想加？
+  2. 如果选 A，最小可行的演示场景你倾向哪一个：
+    - a) 发行场景：用户申请铸造 USDC 到一个 unhosted wallet，agent 决策是否放行
+    - b) 赎回场景：unhosted wallet 持有 USDC 来赎回，agent 决策是否放行 + 是否冻结
+    - c) 二级流转监控：USDC 已在流通，agent 监控涉及 unhosted wallet 的 P2P 转账，触发拦截 / freeze（更接近 Para
+  5.9-5.12 的"流通监控"）
+
+  我倾向 c，因为执行动作（freeze / burn）最有视觉冲击力，最适合录 demo 视频。
+
+  ---
+  决策快照 (2026-05-15)
+
+  - 方案：候选 A — Unhosted Wallet Risk Sentinel
+  - 演示场景：c — 二级流转监控 (监听已流通 USDC 的 P2P 转账,触发 freeze/隔离)
+  - 技术栈：Python 全栈 (FastAPI + web3.py + Anthropic Python SDK) + Solidity 合约
+  - 链上执行：自部署 Mock USDC (ERC-20 带 freeze/blacklist) 在 Sepolia,agent 真实签名调用合约
+  - 数据源:Dune Analytics SQL (主,地址画像 + 资金流) + RPC 实时事件订阅 (转账监听) + Mock 制裁地址库 (兜底 demo 必触发)
+  - Demo 交付:Python CLI 后端 + 极简 Web Dashboard (单页) + 录屏视频 + GitHub repo + 部署 URL
+  - 时间预算:1 个月以上 (允许做完整 MVP + 视频 + 文档)
+  - Rust 不考虑 (EVM 应用层不是 Rust 主场,Anthropic 无 Rust SDK)
+
+  下一步:进入 Plan Mode 草拟实施计划,等用户批准 Diamond Gate 后开工。
+
+  ---
+  Plan Diamond Gate 已通过 (2026-05-15)
+
+  Plan 文件: C:\Users\Administrator\.claude\plans\keen-drifting-falcon.md
+
+  关键调整 (相对之前讨论):
+  - 链从 Sepolia 改为 Circle Arc Testnet (Chain ID 5042002, RPC https://rpc.testnet.arc.network)
+    原因: Arc 是 Circle 自家 L1, 比赛官方推荐, USDC 原生资产, gas 用 USDC 不是 ETH
+  - 数据源从纯 Dune 改为 跨链 Dune (查 Ethereum/L2 历史画像) + Arc RPC 实时事件 + Mock 制裁库
+    原因: Dune 不支持 Arc, 但 unhosted wallet 大概率在主流链有历史
+  - Agent 安全模型升级: Circle Wallets MPC + 合约权限隔离 + YAML 应用限流 (放弃"双轨"思路)
+  - 合约动作: freeze + refundTransfer (原路退回) + quarantineTransfer (强制迁移 recovery wallet), burn 仅 OWNER
+  - Circle 产品集成: USDC + Wallets + CCTP+BridgeKit + Gateway 四个真集成, Nanopayments 不勾
+  - Dashboard 加历史回放, VARA stub 不做 (我们做单辖区)
+
+  时间预算: 5.5 周, 用户预算 1 个月+
+  外部 TODO: 登录 Ignyte 拿评分细则与视频长度规范; 注册 Circle Developer Account
+
+  M1 开工: 链基础设施 (合约 + 部署 + 监听) + Circle 账号注册

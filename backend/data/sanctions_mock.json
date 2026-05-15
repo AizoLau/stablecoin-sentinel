@@ -1,0 +1,41 @@
+{
+  "version": "2026-05-15",
+  "source": "Synthetic dataset for HK Stablecoin Challenge demo. Mirrors structure of real OFAC SDN / HKMA gazette / Chainalysis-tagged entries. Addresses are randomly generated and DO NOT correspond to any real entity.",
+  "entries": [
+    {
+      "address": "0x1111111111111111111111111111111111111111",
+      "tags": ["known-mixer"],
+      "source": "DEMO-OFAC-001",
+      "added": "2026-01-15",
+      "paragraph_ref": "7.5"
+    },
+    {
+      "address": "0x2222222222222222222222222222222222222222",
+      "tags": ["sanctions-list", "designated-party"],
+      "source": "DEMO-HKMA-GAZETTE",
+      "added": "2026-02-03",
+      "paragraph_ref": "7.2"
+    },
+    {
+      "address": "0x3333333333333333333333333333333333333333",
+      "tags": ["shell-vasp"],
+      "source": "DEMO-VASP-DD",
+      "added": "2026-03-10",
+      "paragraph_ref": "6.32"
+    },
+    {
+      "address": "0x4444444444444444444444444444444444444444",
+      "tags": ["high-risk-jurisdiction", "darknet-market"],
+      "source": "DEMO-CHAINALYSIS",
+      "added": "2026-03-22",
+      "paragraph_ref": "5.4"
+    },
+    {
+      "address": "0x5555555555555555555555555555555555555555",
+      "tags": ["ransomware-payout"],
+      "source": "DEMO-LAW-ENFORCEMENT",
+      "added": "2026-04-08",
+      "paragraph_ref": "5.12"
+    }
+  ]
+}
