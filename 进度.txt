@@ -126,3 +126,57 @@
   外部 TODO: 登录 Ignyte 拿评分细则与视频长度规范; 注册 Circle Developer Account
 
   M1 开工: 链基础设施 (合约 + 部署 + 监听) + Circle 账号注册
+
+  ---
+  M1 完成 (2026-05-15)
+
+  里程碑 M1 全部任务通过验证:
+  - T1 toolchain: Foundry 1.5.1, Node 24, Git 2.53, Miniconda3 Python 3.13 venv
+  - T2 project scaffold: 目录树 + .gitignore + .env/.env.example + pyproject.toml + foundry.toml
+  - T3 MockUSDC.sol: freeze + refund + quarantine + OWNER-only burn, events 携带 paragraphRef
+  - T4 Foundry tests: 18/18 PASS (角色隔离 / 冻结流 / 退款 / 隔离 / 边界 / 事件)
+  - T5 Deploy.s.sol: Arc testnet 部署脚本 + foundry.toml rpc 配置
+  - T6 链上部署: MockUSDC at 0xA43143DF2C00Bce848af35eF4Cb69911Ae37d95B
+    Owner: 0x1a7F...1755, Sentinel: 0xE14E...9844, Alice (10000 mUSDC seed)
+  - T7 listener.py: web3.py async 轮询 Arc RPC, 端到端验证 Alice->Bob 50 mUSDC 转账事件 < 10s 内被捕获
+  - T8 Circle Dev Account: 用户已注册
+  - T9 Ignyte 登录: 待用户操作 (M5 前必须完成)
+
+  Git commits: 5 个 (scaffold -> install libs + tests pass -> foundry.lock -> deploy MockUSDC -> M1 complete)
+
+  下一阶段 M2: 单 agent 决策闭环
+  - Sanctions check (本地 JSON lookup)
+  - Dune cross-chain client (主网 + L2 地址画像)
+  - ManagerAgent v1 + Anthropic 单次调用产生 Decision JSON
+  - ExecutorAgent + Circle Wallets API 集成 (sentinel 签 freeze tx)
+  - 端到端 CLI demo: 触发 transfer -> flagged -> freeze 落链
+
+  M2 阻塞条件:
+  - 用户提供 GEMINI_API_KEY (从 Claude/Anthropic 切换到 Google Gemini)
+  - 用户提供 DEBANK_ACCESSKEY (从 Dune 切换到 DeBank Cloud, 用户已有)
+  - 用户在 Circle Console 创建 Wallets sandbox + 提供 CIRCLE_API_KEY/ENTITY_SECRET
+    Circle Wallets 在 Arc testnet 支持需 M2 第一天 sandbox 内验证
+
+  ---
+  M1 后技术栈调整 (2026-05-15)
+
+  用户提出三项变更:
+  1. 数据源: Dune -> DeBank Cloud API (用户已有 accesskey)
+  2. Agent 后端: Anthropic Claude -> Google Gemini (gemini-2.5-pro / gemini-2.5-flash)
+  3. 后期方向: MVP 后考虑 distillation 到小模型 (Llama/Qwen 8B), MVP 阶段不做 fine-tune
+
+  新增 MVP 范围: RAG (检索增强生成)
+  - 把 HKMA AML Guideline + Cap 656 切块 + embedding + 存 Chroma
+  - Agent 推理时 retrieve top-K 相关条款, 而非塞进 system prompt
+  - 应对 Gemini 无 prompt caching 的成本问题
+  - 主要叙事价值: "每个段落引用是 retrieved 不是 hallucinated"
+
+  时间预算: 5.5 周 -> 6 周 (+RAG 3-5 天)
+
+  代码层调整:
+  - pyproject.toml: 删 anthropic + dune-client, 加 google-genai + chromadb
+  - .env / .env.example: ANTHROPIC_API_KEY -> GEMINI_API_KEY, DUNE_API_KEY -> DEBANK_ACCESSKEY
+  - backend/config.py: 新字段 gemini_*, debank_*, rag_chroma_path
+  - 新模块: backend/rag/{ingest,retrieve}.py
+  - 文件树: backend/data/dune_client.py -> debank_client.py
+  - Plan 文件已同步更新

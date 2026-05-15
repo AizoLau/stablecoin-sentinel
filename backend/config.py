@@ -23,9 +23,18 @@ class Settings(BaseSettings):
     arc_rpc_url_quicknode: str = ""
     arc_explorer_url: str = "https://explorer.testnet.arc.network"
 
-    # External services
-    anthropic_api_key: str = ""
-    dune_api_key: str = ""
+    # Google Gemini
+    gemini_api_key: str = ""
+    gemini_model_pro: str = "gemini-2.5-pro"
+    gemini_model_flash: str = "gemini-2.5-flash"
+
+    # DeBank Cloud (cross-chain address profiling)
+    debank_accesskey: str = ""
+    debank_base_url: str = "https://pro-openapi.debank.com"
+
+    # RAG (Chroma vector DB)
+    rag_chroma_path: str = "./chroma_db"
+    rag_collection_name: str = "hkma_aml_guideline"
 
     # Circle Wallets
     circle_api_key: str = ""
