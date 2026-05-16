@@ -17,6 +17,8 @@ Submission for the **Hong Kong Stablecoin Challenge — Track 4: Agentic Economy
 > [`PROMPTS.md`](./docs/PROMPTS.md) /
 > [`ENV.md`](./docs/ENV.md). For architecture / regulatory mapping:
 > [`ARCHITECTURE.md`](./ARCHITECTURE.md) / [`TRACEABILITY.md`](./TRACEABILITY.md).
+> For deployment + submission: [`deploy.md`](./docs/deploy.md) /
+> [`SUBMISSION.md`](./docs/SUBMISSION.md) / [`demo_script.md`](./docs/demo_script.md).
 
 ---
 
