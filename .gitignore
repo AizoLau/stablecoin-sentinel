@@ -29,12 +29,14 @@ recovery_file.dat
 circle_recovery_file.*
 *.pem
 
-# IDE / OS
+# IDE / OS / agent harness local state
 .vscode/
 .idea/
 *.swp
 .DS_Store
 Thumbs.db
+.claude/
+.serena/
 
 # Build artifacts
 dist/
