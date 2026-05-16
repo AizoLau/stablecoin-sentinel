@@ -1,0 +1,83 @@
+# Render Blueprint for the Unhosted Wallet Risk Sentinel.
+# https://render.com/docs/blueprint-spec
+#
+# Usage:
+#   1. Push this repo to GitHub.
+#   2. In Render, click "New" -> "Blueprint" and point at the repo.
+#   3. Render reads render.yaml and prompts for the `sync: false` env values.
+#   4. Click Apply. First build takes 4-6 minutes; subsequent deploys ~2 minutes.
+#
+# After deploy:
+#   - Dashboard: https://<your-service>.onrender.com/dashboard/
+#   - Health:    https://<your-service>.onrender.com/health
+#
+# Notes:
+#   - Free plan goes to sleep after 15 minutes of inactivity. First request after
+#     sleep takes ~30 seconds. For a recorded demo, hit /health once 60 seconds
+#     before recording starts, or upgrade to the $7 starter plan.
+#   - Render free plan has no persistent disk. The audit_log SQLite at /tmp/audit.db
+#     is ephemeral and resets on every restart. RAG (Chroma) is bundled into the
+#     image so it survives restarts.
+
+services:
+  - type: web
+    name: stablecoin-sentinel
+    runtime: docker
+    plan: free
+    region: singapore   # closest to Hong Kong; change if your judges are elsewhere
+    branch: master
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      # --- Secrets (Render will prompt at apply-time) ---
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: DEBANK_ACCESSKEY
+        sync: false
+      - key: CIRCLE_API_KEY
+        sync: false
+      - key: CIRCLE_ENTITY_SECRET
+        sync: false
+      - key: CIRCLE_SENTINEL_WALLET_ID
+        sync: false
+      - key: CIRCLE_SENTINEL_WALLET_ADDRESS
+        sync: false
+      - key: DEPLOYER_PRIVATE_KEY
+        sync: false
+
+      # --- Public config (committed) ---
+      - key: ARC_RPC_URL
+        value: https://rpc.testnet.arc.network
+      - key: ARC_CHAIN_ID
+        value: "5042002"
+      - key: ARC_EXPLORER_URL
+        value: https://explorer.testnet.arc.network
+
+      - key: DEBANK_BASE_URL
+        value: https://pro-openapi.debank.com
+
+      - key: GEMINI_MODEL_PRO
+        value: gemini-2.5-pro
+      - key: GEMINI_MODEL_FLASH
+        value: gemini-2.5-flash
+
+      - key: MOCK_USDC_ADDR
+        value: "0xA43143DF2C00Bce848af35eF4Cb69911Ae37d95B"
+      - key: DEMO_ALICE_ADDRESS
+        value: "0x6F106e2D89B58FEC6Fa1037Fd6e2cEAa586F7d59"
+      - key: DEMO_BOB_ADDRESS
+        value: "0x0F7Ba243461ba7E5043383E9D4D9B96AE8b02201"
+      - key: DEMO_RECOVERY_ADDRESS
+        value: "0x92daf439dC28071fdcDaA69C1d7297663E283f27"
+
+      - key: SQLITE_PATH
+        value: /tmp/audit.db
+      - key: LOG_LEVEL
+        value: INFO
+      - key: SSE_HEARTBEAT_SECONDS
+        value: "15"
+
+      - key: RAG_CHROMA_PATH
+        value: ./chroma_db
+      - key: RAG_COLLECTION_NAME
+        value: hkma_aml_guideline

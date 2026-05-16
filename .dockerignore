@@ -1,0 +1,50 @@
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# Local env / IDE
+.venv/
+.env
+.env.local
+.env.*.local
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Python build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+
+# Contracts (Solidity not needed at runtime — deploy is a one-off)
+contracts/
+
+# Local databases / secrets
+audit.db
+*.sqlite
+recovery_file.dat
+circle_recovery_file.*
+*.pem
+
+# Documentation that's not load-bearing at runtime
+进度.txt
+ARCHITECTURE.md
+TRACEABILITY.md
+docs/demo_script.md
+docs/deploy.md
+CN/
+*.pdf
+our-direction.md
+competition-requirements.md
+.claude/
+.serena/
+
+# Test artifacts
+backend/tests/
