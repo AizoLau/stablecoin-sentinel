@@ -11,8 +11,12 @@ Submission for the **Hong Kong Stablecoin Challenge — Track 4: Agentic Economy
 
 > **New to this repo?** Start with [`docs/CODE_TOUR.md`](./docs/CODE_TOUR.md) —
 > a 30-minute onboarding guide with reading order, run commands, and extension
-> points. Returning visitors can jump straight to
-> [`ARCHITECTURE.md`](./ARCHITECTURE.md) or [`TRACEABILITY.md`](./TRACEABILITY.md).
+> points. For reference docs (lookup, not narrative):
+> [`API.md`](./docs/API.md) /
+> [`CONTRACTS.md`](./docs/CONTRACTS.md) /
+> [`PROMPTS.md`](./docs/PROMPTS.md) /
+> [`ENV.md`](./docs/ENV.md). For architecture / regulatory mapping:
+> [`ARCHITECTURE.md`](./ARCHITECTURE.md) / [`TRACEABILITY.md`](./TRACEABILITY.md).
 
 ---
 

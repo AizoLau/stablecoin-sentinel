@@ -56,6 +56,14 @@ By now you should be able to answer: *"If sanctions registry hits the recipient,
 what happens?"* If yes, move on. If no, re-read `ARCHITECTURE.md`'s data-flow
 section.
 
+For **lookup-style reference docs** (which you don't read top-to-bottom, you
+search through):
+
+- **[`docs/API.md`](./API.md)** — every REST endpoint's request/response schema + curl examples
+- **[`docs/CONTRACTS.md`](./CONTRACTS.md)** — MockUSDC function/event/error/role reference + gas costs
+- **[`docs/PROMPTS.md`](./PROMPTS.md)** — verbatim agent system prompts + design rationale + tuning guidance
+- **[`docs/ENV.md`](./ENV.md)** — environment variable dictionary (purpose / required / example / source)
+
 ---
 
 ## Run it (10 minutes)
