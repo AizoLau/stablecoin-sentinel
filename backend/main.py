@@ -171,11 +171,26 @@ class DemoTriggerBody(BaseModel):
 
 @app.get("/health")
 async def health() -> dict:
+    sentinel_balance_wei: int | None = None
+    sentinel_gas_low = False
+    try:
+        w3 = Web3(Web3.HTTPProvider(state.settings.arc_rpc_url))
+        sentinel_balance_wei = w3.eth.get_balance(
+            Web3.to_checksum_address(state.settings.circle_sentinel_wallet_address)
+        )
+        # Arc gas is USDC denominated but cast/Web3 returns 18-decimal wei representation.
+        # 1 USDC == 1e18 here; warn below 1 USDC.
+        sentinel_gas_low = sentinel_balance_wei < 10**18
+    except Exception as exc:
+        logger.warning("Could not read sentinel balance: %s", exc)
+
     return {
-        "ok": True,
+        "ok": not sentinel_gas_low,
         "audit_count": state.audit.count(),
         "rag_collection_size": state.retriever.collection_size(),
         "sentinel_wallet": state.settings.circle_sentinel_wallet_address,
+        "sentinel_balance_wei": sentinel_balance_wei,
+        "sentinel_gas_low": sentinel_gas_low,
         "mock_usdc_addr": state.settings.mock_usdc_addr,
         "chain_id": state.settings.arc_chain_id,
     }
