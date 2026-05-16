@@ -54,11 +54,25 @@ code, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; 
 /* Controls */
 .controls {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   align-items: center;
+  flex-wrap: wrap;
   padding: 12px 24px;
   background: var(--panel-2);
   border-bottom: 1px solid var(--border);
+}
+.scenario-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.scenario-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-right: 4px;
 }
 .controls button {
   padding: 8px 14px;

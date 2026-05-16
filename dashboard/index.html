@@ -21,7 +21,18 @@
   </header>
 
   <section class="controls">
-    <button id="btn-trigger" class="primary">Trigger demo transfer (Alice → Bob, sanctioned)</button>
+    <div class="scenario-group">
+      <span class="scenario-label">Demo scenarios:</span>
+      <button class="scenario-btn primary" data-scenario="sanctioned_recipient">
+        🔒 Sanctioned recipient (FREEZE)
+      </button>
+      <button class="scenario-btn" data-scenario="cctp_inflow_ethereum">
+        🌉 CCTP inflow from Ethereum (cross-border FREEZE)
+      </button>
+      <button class="scenario-btn" data-scenario="clean_pass">
+        ✅ Clean transfer (PASS)
+      </button>
+    </div>
     <button id="btn-refresh">Refresh history</button>
     <label class="hint">
       <input type="checkbox" id="opt-unfreeze" checked /> unfreeze recipient first (allow replay)

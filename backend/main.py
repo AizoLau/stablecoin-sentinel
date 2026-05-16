@@ -34,6 +34,7 @@ from backend.agent.manager import ManagerAgent
 from backend.chain.circle_wallets import CircleWalletsClient
 from backend.chain.executor import CircleWalletsSigner, Executor
 from backend.config import PROJECT_ROOT, Settings, get_settings
+from backend.crosschain.cctp_simulator import build_cctp_inflow_context
 from backend.data.debank_client import DeBankClient
 from backend.data.sanctions import SanctionsHit, SanctionsRegistry
 from backend.rag.retrieve import HKMARetriever
@@ -154,14 +155,14 @@ def _unfreeze_target(target: str) -> dict:
 
 
 class DemoTriggerBody(BaseModel):
+    scenario: str = Field(
+        default="sanctioned_recipient",
+        description="one of: sanctioned_recipient | cctp_inflow_ethereum | clean_pass",
+    )
     from_address: str | None = None
     to_address: str | None = None
     amount: int = Field(default=50_000_000, ge=1, description="raw units (6 decimals)")
     tx_hash: str | None = None
-    tag_recipient: bool = Field(
-        default=True, description="if true, inject the recipient into mock sanctions registry"
-    )
-    recipient_tags: list[str] = Field(default_factory=lambda: ["known-mixer", "sanctions-list"])
     unfreeze_first: bool = Field(default=False)
 
 
@@ -227,14 +228,35 @@ async def demo_trigger(body: DemoTriggerBody) -> dict:
         loop = asyncio.get_event_loop()
         unfreeze_info = await loop.run_in_executor(None, _unfreeze_target, to_addr)
 
-    if body.tag_recipient:
+    scenario = body.scenario
+    cctp_meta: dict | None = None
+    if scenario == "sanctioned_recipient":
         state.sanctions._index[to_addr.lower()] = SanctionsHit(
             address=to_addr.lower(),
-            tags=tuple(body.recipient_tags),
+            tags=("known-mixer", "sanctions-list"),
             source="DEMO-OFAC-001",
             added="2026-05-16",
             paragraph_ref="7.5",
         )
+    elif scenario == "cctp_inflow_ethereum":
+        ctx = build_cctp_inflow_context("ethereum", to_addr, amount=body.amount)
+        state.sanctions._index[to_addr.lower()] = SanctionsHit(
+            address=to_addr.lower(),
+            tags=ctx.risk_tags,
+            source=f"DEMO-CCTP-INFLOW-{ctx.source_chain.upper()}-MAINNET",
+            added="2026-05-16",
+            paragraph_ref="6.41",
+        )
+        cctp_meta = {
+            "source_chain": ctx.source_chain,
+            "source_domain": ctx.source_domain,
+            "source_tx_hash": ctx.source_tx_hash,
+            "risk_tags": list(ctx.risk_tags),
+        }
+    elif scenario == "clean_pass":
+        state.sanctions._index.pop(to_addr.lower(), None)
+    else:
+        raise HTTPException(400, f"unknown scenario: {scenario!r}")
 
     tx_hash = body.tx_hash or ("0x" + os.urandom(32).hex())
     transfer = TransferEvent(
@@ -255,6 +277,8 @@ async def demo_trigger(body: DemoTriggerBody) -> dict:
 
     return {
         "record_id": record_id,
+        "scenario": scenario,
+        "cctp": cctp_meta,
         "unfreeze": unfreeze_info,
         "decision": {
             "action": decision.action.value,

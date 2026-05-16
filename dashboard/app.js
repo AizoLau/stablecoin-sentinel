@@ -16,7 +16,7 @@ const els = {
   chain:         document.getElementById("status-chain"),
   sentinel:      document.getElementById("status-sentinel"),
   count:         document.getElementById("status-count"),
-  trigger:       document.getElementById("btn-trigger"),
+  scenarioBtns:  document.querySelectorAll(".scenario-btn"),
   refresh:       document.getElementById("btn-refresh"),
   unfreezeOpt:   document.getElementById("opt-unfreeze"),
   feedEmpty:     document.getElementById("feed-empty"),
@@ -57,24 +57,28 @@ async function loadDecisions() {
   }
 }
 
-async function triggerDemo() {
-  els.trigger.disabled = true;
-  els.trigger.textContent = "Submitting on-chain action…";
+async function triggerScenario(scenario, button) {
+  const originalLabel = button.textContent;
+  els.scenarioBtns.forEach((b) => (b.disabled = true));
+  button.textContent = "Submitting on-chain action…";
   try {
     const r = await fetch(`${API}/demo/trigger`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        scenario,
         unfreeze_first: els.unfreezeOpt.checked,
-        tag_recipient: true,
       }),
     });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    if (!r.ok) {
+      const body = await r.text();
+      throw new Error(`HTTP ${r.status}: ${body}`);
+    }
   } catch (err) {
     alert(`Demo trigger failed: ${err.message}`);
   } finally {
-    els.trigger.disabled = false;
-    els.trigger.textContent = "Trigger demo transfer (Alice → Bob, sanctioned)";
+    els.scenarioBtns.forEach((b) => (b.disabled = false));
+    button.textContent = originalLabel;
   }
 }
 
@@ -256,7 +260,9 @@ async function init() {
   await loadHealth();
   await loadDecisions();
   connectSse();
-  els.trigger.addEventListener("click", triggerDemo);
+  els.scenarioBtns.forEach((btn) => {
+    btn.addEventListener("click", () => triggerScenario(btn.dataset.scenario, btn));
+  });
   els.refresh.addEventListener("click", () => { loadHealth(); loadDecisions(); });
 }
 
