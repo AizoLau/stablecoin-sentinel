@@ -9,6 +9,11 @@
 Submission for the **Hong Kong Stablecoin Challenge — Track 4: Agentic Economy**
 (hosted by Ignyte, sponsored by Circle + Arc).
 
+> **New to this repo?** Start with [`docs/CODE_TOUR.md`](./docs/CODE_TOUR.md) —
+> a 30-minute onboarding guide with reading order, run commands, and extension
+> points. Returning visitors can jump straight to
+> [`ARCHITECTURE.md`](./ARCHITECTURE.md) or [`TRACEABILITY.md`](./TRACEABILITY.md).
+
 ---
 
 ## Why this project exists
