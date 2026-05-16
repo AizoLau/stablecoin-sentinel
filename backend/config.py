@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     # Circle Wallets
     circle_api_key: str = ""
     circle_entity_secret: str = ""
+    circle_wallet_set_id: str = ""
     circle_sentinel_wallet_id: str = ""
     circle_sentinel_wallet_address: str = ""
 

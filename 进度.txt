@@ -180,3 +180,35 @@
   - 新模块: backend/rag/{ingest,retrieve}.py
   - 文件树: backend/data/dune_client.py -> debank_client.py
   - Plan 文件已同步更新
+
+  ---
+  M2 完成 (2026-05-16)
+
+  里程碑 M2 全部任务通过 + 端到端验证:
+  - T13 DeBank client: 70 chains 跨链画像, scam-flag 信号 (Vitalik 测试: 17 scam tx, Bob 测试: 全 0 clean)
+  - T12 Gemini ManagerAgent v1: PASS (risk 5) / FREEZE (risk 100) 两场景按 HKMA 段落正确决策
+  - T14 external keys: 全部到位
+    - GEMINI_API_KEY: ping OK (gemini-2.5-flash 返 "OK")
+    - DEBANK_ACCESSKEY: ping OK (85 supported chains)
+    - CIRCLE_API_KEY: 注册 + register entity secret + 创建 ARC-TESTNET wallet 全部成功
+    - Circle Sentinel wallet: 0x11afacf004f144db1df3857ee1ea555d233c33c7 (LIVE on ARC-TESTNET)
+    - Entity secret + recovery file 已生成 (recovery_file.dat 已 gitignored)
+  - T10 Circle Wallets executor: 三层签名后端抽象 (TxSigner Protocol, CircleWalletsSigner 实现)
+  - T11 端到端 demo (backend/cli/m2_demo.py):
+    端到端全程跑通: Alice -> Bob 50 mUSDC -> Gemini 决策 FREEZE (risk 100, paragraphs 5.10c/5.11/5.12/7.2/7.5)
+    -> Circle Wallets MPC 签名 -> Arc 链上 freeze tx 0xf39dce43...
+    -> Bob.frozen()=true on-chain 验证通过
+    支持 --unfreeze-first 让 demo 可无限重跑 (M5 录视频用)
+
+  Git commits 累计 7 个 (M1 5 个 + M2 partial + Circle Wallets executor 待 commit)
+  链上历史 freeze tx: 0xcaf009eb... (initial), 0xf39dce43... (demo replay)
+
+  下一阶段 M3: 4 子 agent split + RAG + XAI + Dashboard
+  - 拆分 ManagerAgent 为 RiskAssessor / ComplianceDecider / ExecutorAgent / Reporter
+  - RAG ingestion: HKMA Guideline + Cap 656 -> Chroma vector DB + retrieve_paragraphs tool
+  - audit_log SQLite (HKMA Ch 9 retention model)
+  - FastAPI SSE backend
+  - Dashboard 单页 (live feed + decision card + XAI panel + historical replay)
+  - action_limits.yaml 应用层限流
+
+  时间预算: M3 = 2 周 (含 RAG)

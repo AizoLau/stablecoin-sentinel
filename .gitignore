@@ -25,6 +25,9 @@ audit.db
 .env
 .env.local
 .env.*.local
+recovery_file.dat
+circle_recovery_file.*
+*.pem
 
 # IDE / OS
 .vscode/
