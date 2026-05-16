@@ -20,56 +20,22 @@ from pydantic import BaseModel, Field
 from backend.config import Settings
 from backend.data.debank_client import AddressProfile, DeBankClient
 from backend.data.sanctions import SanctionsHit, SanctionsRegistry
+from backend.rag.retrieve import HKMARetriever, RetrievedChunk
 from backend.store.models import Action, Decision, TransferEvent
 
 logger = logging.getLogger(__name__)
 
 
-HKMA_PARAGRAPH_EXCERPTS = """\
-HKMA AML/CFT Guideline for Licensed Stablecoin Issuers — paragraphs relevant to
-unhosted-wallet P2P transfer monitoring:
-
-- Para 4.39: When a customer uses an unhosted wallet (other than 4.37 exceptions) to
-  receive stablecoins from a licensee at issuance or return stablecoins at redemption,
-  the licensee should screen the wallet address to identify any transaction directly or
-  indirectly associated with illicit/suspicious activities or designated parties.
-
-- Para 5.4: A licensee should adopt a risk-based approach in ongoing monitoring; the
-  scope and frequency of monitoring should be commensurate with the ML/TF risk.
-
-- Para 5.7: A licensee should examine the background and purposes of transactions and
-  document the grounds for any suspicion when transactions are inconsistent with the
-  customer profile, unusually large/complex, or involve wallet addresses tied to
-  illicit activities.
-
-- Para 5.10(c): A licensee should have on-chain capabilities to freeze stablecoins
-  promptly upon regulator / law-enforcement request or court order.
-
-- Para 5.11 (MARQUEE): As the effectiveness of unhosted wallet risk mitigating
-  measures is yet to be proven, the HKMA expects licensees to adopt a CAUTIOUS
-  approach. Unless effectiveness can be demonstrated, identity of each holder should
-  be verified.
-
-- Para 5.12: If a licensee identifies stablecoin transactions or wallet addresses
-  directly/indirectly associated with illicit activities or designated parties, it
-  should promptly investigate and escalate via JFIU per Chapter 8.
-
-- Para 6.22-6.24: A licensee should have the ability to delay, intercept, or reverse
-  suspicious stablecoin transfers when warranted by AML/CFT risk.
-
-- Para 6.40-6.42: P2P transfers to/from unhosted wallets between non-customer holders
-  require ongoing monitoring per Para 5.9-5.12.
-
-- Para 7.2-7.5: Sanctions screening against UNSCR / HK gazette / HKMA notices is
-  mandatory; positive matches trigger immediate hold + investigation.
-"""
-
-SYSTEM_PROMPT = f"""\
+SYSTEM_PROMPT = """\
 You are the compliance decision agent for a Hong Kong licensed stablecoin issuer. You
 monitor USDC P2P transfers between unhosted wallets on Arc Network and decide whether
 to PASS, REFUND, QUARANTINE, or FREEZE based on AML/CFT risk.
 
-{HKMA_PARAGRAPH_EXCERPTS}
+Each user message includes a "Retrieved HKMA paragraphs" block. You MUST treat that
+block as the authoritative regulatory ground truth: every paragraph_id you cite in
+`paragraphs_cited` MUST exactly match a paragraph_id present in the retrieved block.
+Do not invent paragraph numbers. If the retrieved block does not justify an action,
+prefer PASS or escalate to QUARANTINE with reasoning.
 
 Action semantics:
 - PASS: low risk, allow the transfer to stand.
@@ -131,10 +97,12 @@ class ManagerAgent:
         settings: Settings,
         debank: DeBankClient,
         sanctions: SanctionsRegistry,
+        retriever: HKMARetriever,
     ):
         self.settings = settings
         self.debank = debank
         self.sanctions = sanctions
+        self.retriever = retriever
         self._gemini = genai.Client(api_key=settings.gemini_api_key)
         self.model = settings.gemini_model_pro
 
@@ -144,8 +112,17 @@ class ManagerAgent:
         from_hit = self.sanctions.lookup(transfer.from_address)
         to_hit = self.sanctions.lookup(transfer.to_address)
 
-        context = self._build_context(transfer, from_profile, to_profile, from_hit, to_hit)
-        logger.info("Calling %s for transfer %s", self.model, transfer.tx_hash[:10])
+        retrieved = self._retrieve_paragraphs(
+            from_profile, to_profile, from_hit, to_hit
+        )
+
+        context = self._build_context(
+            transfer, from_profile, to_profile, from_hit, to_hit, retrieved
+        )
+        logger.info(
+            "Calling %s for transfer %s with %d retrieved paragraphs",
+            self.model, transfer.tx_hash[:10], len(retrieved),
+        )
 
         resp = self._gemini.models.generate_content(
             model=self.model,
@@ -170,6 +147,30 @@ class ManagerAgent:
             reasoning_md=parsed.reasoning_md,
         )
 
+    def _retrieve_paragraphs(
+        self,
+        from_profile: AddressProfile,
+        to_profile: AddressProfile,
+        from_hit: SanctionsHit | None,
+        to_hit: SanctionsHit | None,
+    ) -> list[RetrievedChunk]:
+        """Build a focused RAG query from the situation and pull top paragraphs."""
+        signals = ["unhosted wallet peer-to-peer transfer monitoring"]
+        if from_hit or to_hit:
+            tags = list((from_hit.tags if from_hit else ()) + (to_hit.tags if to_hit else ()))
+            signals.append(f"sanctions screening positive match tags={tags}")
+            signals.append("freeze stablecoin designated party")
+        if (from_profile and from_profile.has_scam_history()) or (
+            to_profile and to_profile.has_scam_history()
+        ):
+            signals.append("counterparty with scam-flagged transaction history")
+        if (from_profile and not from_profile.is_active()) and (
+            to_profile and not to_profile.is_active()
+        ):
+            signals.append("low activity new wallet ongoing monitoring")
+        query = "; ".join(signals)
+        return self.retriever.retrieve(query, top_k=8)
+
     def _build_context(
         self,
         transfer: TransferEvent,
@@ -177,8 +178,14 @@ class ManagerAgent:
         to_profile: AddressProfile,
         from_hit: SanctionsHit | None,
         to_hit: SanctionsHit | None,
+        retrieved: list[RetrievedChunk],
     ) -> str:
-        amount_human = transfer.amount / 1e6  # mUSDC has 6 decimals
+        amount_human = transfer.amount / 1e6
+        retrieved_block = "\n".join(
+            f"- Para {c.paragraph_id} (sim={c.similarity:.2f}): {c.text[:400]}"
+            for c in retrieved
+        ) or "  (no relevant paragraphs retrieved)"
+
         return f"""\
 Transfer event observed on Arc Testnet:
 - tx_hash: {transfer.tx_hash}
@@ -195,5 +202,8 @@ Sanctions registry lookup:
 {_sanctions_summary(transfer.from_address, from_hit, "FROM")}
 {_sanctions_summary(transfer.to_address, to_hit, "TO  ")}
 
-Decide the action per the system rules. Cite paragraphs precisely.
+Retrieved HKMA paragraphs (authoritative — cite only these IDs):
+{retrieved_block}
+
+Decide the action per the system rules. Cite only retrieved paragraph_ids precisely.
 """

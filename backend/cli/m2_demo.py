@@ -26,6 +26,7 @@ from backend.chain.executor import CircleWalletsSigner, Executor
 from backend.config import PROJECT_ROOT, get_settings
 from backend.data.debank_client import DeBankClient
 from backend.data.sanctions import SanctionsHit, SanctionsRegistry
+from backend.rag.retrieve import HKMARetriever
 from backend.store.models import TransferEvent
 
 
@@ -102,9 +103,10 @@ async def run_demo(args: argparse.Namespace) -> int:
     print(f"  to:     {event.to_address}")
     print(f"  amount: {event.amount / 1e6:.2f} mUSDC")
 
-    banner("STEP 3: ManagerAgent decides (Gemini + DeBank + Sanctions)")
+    banner("STEP 3: ManagerAgent decides (Gemini + DeBank + Sanctions + RAG)")
     debank = DeBankClient(s.debank_accesskey, s.debank_base_url)
-    manager = ManagerAgent(s, debank, sanctions)
+    retriever = HKMARetriever(s)
+    manager = ManagerAgent(s, debank, sanctions, retriever)
     try:
         decision = await manager.decide(event)
     finally:
