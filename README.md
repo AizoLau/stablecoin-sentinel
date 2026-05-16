@@ -60,17 +60,15 @@ not paraphrase a rule it never read.
 ### Setup
 
 ```powershell
-# 1. Clone + install Python deps
-git clone <this-repo>
-cd StablecoinChallenge
+# 1. Clone with submodules + install Python deps
+git clone --recursive <this-repo>
+cd stablecoin-sentinel
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e .
 
-# 2. Install Solidity dependencies (OpenZeppelin + forge-std)
-cd contracts
-forge install foundry-rs/forge-std
-forge install OpenZeppelin/openzeppelin-contracts
-cd ..
+# If you forgot --recursive on clone, initialize submodules now
+# (OpenZeppelin v5.6.1 + forge-std v1.16.1 are pinned via .gitmodules)
+git submodule update --init --recursive
 
 # 3. Fill in .env (use .env.example as template)
 # Required:
