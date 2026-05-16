@@ -1,22 +1,27 @@
-"""ManagerAgent v1 — single-shot Gemini decision over a TransferEvent.
+"""ManagerAgent — orchestrates the four sub-agents through the decision pipeline.
 
-M2 scope: one synchronous LLM call that consumes the transfer event, both addresses'
-DeBank profiles, and sanctions registry hits, then returns an Action + paragraph-cited
-reasoning.
+The Manager is intentionally NOT itself an LLM. Splitting orchestration out of
+LLM-driven reasoning keeps the control flow auditable and makes each sub-agent's
+contract testable in isolation. Pipeline:
 
-M3 will split this into RiskAssessor / ComplianceDecider / ExecutorAgent / Reporter
-and replace the inline paragraph excerpts with RAG retrieval over Chroma.
+    TransferEvent
+       └── fetch DeBank profiles + sanctions lookups
+       └── RAG.retrieve(top-K HKMA / Cap 656 paragraphs)
+       └── RiskAssessor.assess()       -> RiskProfile
+       └── ComplianceDecider.decide()  -> Action + cited paragraphs
+       └── Reporter.report()           -> markdown XAI justification
+       └── Manager assembles Decision
+       (Executor downstream submits on-chain via Circle Wallets MPC)
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Literal
+import re
 
-from google import genai
-from google.genai import types
-from pydantic import BaseModel, Field
-
+from backend.agent.compliance_decider import ComplianceDecider
+from backend.agent.reporter import Reporter
+from backend.agent.risk_assessor import RiskAssessor, RiskProfileOutput
 from backend.config import Settings
 from backend.data.debank_client import AddressProfile, DeBankClient
 from backend.data.sanctions import SanctionsHit, SanctionsRegistry
@@ -26,69 +31,12 @@ from backend.store.models import Action, Decision, TransferEvent
 logger = logging.getLogger(__name__)
 
 
-SYSTEM_PROMPT = """\
-You are the compliance decision agent for a Hong Kong licensed stablecoin issuer. You
-monitor USDC P2P transfers between unhosted wallets on Arc Network and decide whether
-to PASS, REFUND, QUARANTINE, or FREEZE based on AML/CFT risk.
-
-Each user message includes a "Retrieved HKMA paragraphs" block. You MUST treat that
-block as the authoritative regulatory ground truth: every paragraph_id you cite in
-`paragraphs_cited` MUST exactly match a paragraph_id present in the retrieved block.
-Do not invent paragraph numbers. If the retrieved block does not justify an action,
-prefer PASS or escalate to QUARANTINE with reasoning.
-
-Action semantics:
-- PASS: low risk, allow the transfer to stand.
-- REFUND: medium risk; return the funds to the sender (Para 6.22-6.24).
-- QUARANTINE: high risk but recipient may be victim; force-move funds to recovery
-  wallet for manual review (Para 6.22-6.24 + 6.40-6.42).
-- FREEZE: confirmed sanctions match or strong illicit-activity signal; lock the
-  recipient address from any further transfers (Para 5.10(c), 5.11, 7.5).
-
-Decision rules:
-- Sanctions registry hit on EITHER address: FREEZE that address.
-- DeBank profile shows recipient has multiple scam-flagged historical tx AND no
-  prior CDD relationship: prefer QUARANTINE (recipient may be victim of dust) or
-  FREEZE (recipient is the perpetrator) — use judgment.
-- Recipient with zero history and small transfer: PASS (cold wallet, no signal).
-- Always cite specific paragraph numbers in `paragraphs_cited`.
-- `target_address` MUST be the address you are acting on (recipient for FREEZE, the
-  party receiving the refund/quarantine for REFUND/QUARANTINE, or empty string for PASS).
-- `reasoning_md` MUST quote the specific evidence (e.g., "DeBank shows 17 scam tx",
-  "Sanctions registry hit: tag=known-mixer source=DEMO-OFAC-001").
-"""
+_CITATION_PREFIX = re.compile(r"^\s*(?:para(?:graph)?|section|sec\.?|§)\s+", re.IGNORECASE)
 
 
-class LLMDecisionOutput(BaseModel):
-    action: Literal["pass", "refund", "quarantine", "freeze"]
-    target_address: str = Field(description="address acted upon; empty string if PASS")
-    risk_score: int = Field(ge=0, le=100)
-    paragraphs_cited: list[str]
-    reasoning_md: str
-
-
-def _profile_summary(p: AddressProfile, role: str) -> str:
-    if not p.is_active():
-        return f"- {role} ({p.address}): NO ACTIVITY on any chain (cold/new wallet)."
-    return (
-        f"- {role} ({p.address}): {p.chains_count} chains used, "
-        f"{p.tx_count_recent} recent tx, {p.counterparty_count} unique counterparties, "
-        f"scam-flagged tx: {p.scam_tx_count}, total USD value: ${p.total_usd_value:,.0f}."
-        + (
-            f" Scam counterparties involved: {list(p.scam_counterparties[:3])}"
-            if p.scam_counterparties
-            else ""
-        )
-    )
-
-
-def _sanctions_summary(addr: str, hit: SanctionsHit | None, role: str) -> str:
-    if hit is None:
-        return f"- {role} ({addr}): no sanctions registry match."
-    return (
-        f"- {role} ({addr}): SANCTIONS HIT — tags={list(hit.tags)}, "
-        f"source={hit.source}, paragraph_ref={hit.paragraph_ref}."
-    )
+def _normalize_paragraph_id(raw: str) -> str:
+    """Strip prefixes like "Para ", "Section ", "§ " so audit IDs match retrieved IDs."""
+    return _CITATION_PREFIX.sub("", raw).strip()
 
 
 class ManagerAgent:
@@ -103,54 +51,50 @@ class ManagerAgent:
         self.debank = debank
         self.sanctions = sanctions
         self.retriever = retriever
-        self._gemini = genai.Client(api_key=settings.gemini_api_key)
-        self.model = settings.gemini_model_pro
+        self.risk_assessor = RiskAssessor(settings)
+        self.decider = ComplianceDecider(settings)
+        self.reporter = Reporter(settings)
 
     async def decide(self, transfer: TransferEvent) -> tuple[Decision, list[RetrievedChunk]]:
-        """Run the full agent loop and return both the decision and the RAG evidence.
-
-        Returning the retrieved chunks alongside the decision lets the caller persist
-        them in the audit log so the dashboard can later render the full text of every
-        paragraph the agent saw — not only the ones it chose to cite.
-        """
+        # 1. Gather cross-chain + sanctions context (network I/O concurrent-safe).
         from_profile = await self.debank.get_profile(transfer.from_address)
         to_profile = await self.debank.get_profile(transfer.to_address)
         from_hit = self.sanctions.lookup(transfer.from_address)
         to_hit = self.sanctions.lookup(transfer.to_address)
 
-        retrieved = self._retrieve_paragraphs(
-            from_profile, to_profile, from_hit, to_hit
-        )
+        # 2. Pull the most relevant HKMA / Cap 656 paragraphs from RAG.
+        retrieved = self._retrieve_paragraphs(from_profile, to_profile, from_hit, to_hit)
 
-        context = self._build_context(
-            transfer, from_profile, to_profile, from_hit, to_hit, retrieved
+        # 3. RiskAssessor characterizes the risk.
+        risk_profile: RiskProfileOutput = self.risk_assessor.assess(
+            transfer, from_profile, to_profile, from_hit, to_hit
         )
         logger.info(
-            "Calling %s for transfer %s with %d retrieved paragraphs",
-            self.model, transfer.tx_hash[:10], len(retrieved),
+            "Pipeline %s: risk_score=%d flags=%s",
+            transfer.tx_hash[:10], risk_profile.score, risk_profile.flags,
         )
 
-        resp = self._gemini.models.generate_content(
-            model=self.model,
-            contents=context,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT,
-                response_mime_type="application/json",
-                response_schema=LLMDecisionOutput,
-                temperature=0.2,
-            ),
+        # 4. ComplianceDecider picks the enforcement action and cites paragraphs.
+        action_decision = self.decider.decide(transfer, risk_profile, retrieved)
+        logger.info(
+            "Pipeline %s: action=%s cited=%s",
+            transfer.tx_hash[:10], action_decision.action, action_decision.paragraphs_cited,
         )
-        parsed: LLMDecisionOutput = resp.parsed  # type: ignore[assignment]
-        if parsed is None:
-            raise RuntimeError(f"Gemini did not return a parseable Decision: {resp.text!r}")
+
+        # 5. Reporter writes the markdown XAI justification (Para 5.7).
+        reasoning = self.reporter.report(transfer, risk_profile, action_decision, retrieved)
+
+        normalized_paragraphs = [
+            _normalize_paragraph_id(p) for p in action_decision.paragraphs_cited
+        ]
 
         decision = Decision(
             transfer=transfer,
-            action=Action(parsed.action),
-            target_address=parsed.target_address,
-            risk_score=parsed.risk_score,
-            paragraphs_cited=parsed.paragraphs_cited,
-            reasoning_md=parsed.reasoning_md,
+            action=Action(action_decision.action),
+            target_address=action_decision.target_address,
+            risk_score=action_decision.risk_score_final,
+            paragraphs_cited=normalized_paragraphs,
+            reasoning_md=reasoning,
         )
         return decision, retrieved
 
@@ -177,40 +121,3 @@ class ManagerAgent:
             signals.append("low activity new wallet ongoing monitoring")
         query = "; ".join(signals)
         return self.retriever.retrieve(query, top_k=8)
-
-    def _build_context(
-        self,
-        transfer: TransferEvent,
-        from_profile: AddressProfile,
-        to_profile: AddressProfile,
-        from_hit: SanctionsHit | None,
-        to_hit: SanctionsHit | None,
-        retrieved: list[RetrievedChunk],
-    ) -> str:
-        amount_human = transfer.amount / 1e6
-        retrieved_block = "\n".join(
-            f"- Para {c.paragraph_id} (sim={c.similarity:.2f}): {c.text[:400]}"
-            for c in retrieved
-        ) or "  (no relevant paragraphs retrieved)"
-
-        return f"""\
-Transfer event observed on Arc Testnet:
-- tx_hash: {transfer.tx_hash}
-- from: {transfer.from_address}
-- to:   {transfer.to_address}
-- amount: {amount_human:,.2f} mUSDC ({transfer.amount} raw units)
-- block: {transfer.block_number}
-
-Cross-chain DeBank profiles:
-{_profile_summary(from_profile, "FROM")}
-{_profile_summary(to_profile, "TO  ")}
-
-Sanctions registry lookup:
-{_sanctions_summary(transfer.from_address, from_hit, "FROM")}
-{_sanctions_summary(transfer.to_address, to_hit, "TO  ")}
-
-Retrieved HKMA paragraphs (authoritative — cite only these IDs):
-{retrieved_block}
-
-Decide the action per the system rules. Cite only retrieved paragraph_ids precisely.
-"""
