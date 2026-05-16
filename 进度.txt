@@ -212,3 +212,42 @@
   - action_limits.yaml 应用层限流
 
   时间预算: M3 = 2 周 (含 RAG)
+
+  ---
+  M3 完成 (2026-05-16)
+
+  - M3-A: RAG ingest + retrieve + 接 ManagerAgent (HKMA 149 chunks Chroma + Gemini embedding 2)
+  - M3-A+: Cap 656 入库 (按页切 + Section 号 metadata) 259 chunks; audit 持久化 retrieved + dashboard 展开全文
+  - M3-B: ManagerAgent 拆 4 sub-agent (RiskAssessor / ComplianceDecider / Reporter + Python orchestrator)
+  - M3-C: SQLite audit_log + FastAPI backend (/health /decisions /events /demo/trigger)
+  - M3-D: Dashboard 单页 (live SSE feed + decision detail + XAI panel + Para 5.11 marquee)
+
+  RAG 总规模: 408 chunks (149 HKMA + 259 Cap 656)
+  Git 累计: 14 commits
+
+  ---
+  M4 完成 (2026-05-16)
+
+  - M4-A: CCTP inflow simulator + 3 demo scenarios (sanctioned_recipient / cctp_inflow_ethereum / clean_pass) + dashboard 三按钮
+  - M4-B: TRACEABILITY.md (HKMA Tier 1 决策段落映射 + Cap 656 Tier 2 RAG-only)
+  - M4-C: README.md (submission-grade 项目首页, quick-start + architecture overview)
+  - M4-C+: docs/circle_product_feedback.md (强制提交章节 #9, 诚实 UX 反馈)
+  - M4-D: ARCHITECTURE.md (模块 IO 契约 + 数据流逐步 + 设计决策)
+  - M4-E: Rule-engine fallback (LLM 故障时仍 freeze sanctions hit) + /health sentinel balance probe
+
+  关键验证:
+  - Rule-engine fallback 测试通过 (Gemini 全挂时 sentinel 仍上链 freeze 制裁地址)
+  - sentinel_balance_wei ≈ 19.98 USDC (gas 充足)
+  - 三个 scenario 全部端到端通过, Arc 链上有真 tx hash 可在 explorer 验证
+
+  Git 累计: 18 commits
+
+  ---
+  下一阶段 M5: 提交包 (用户介入)
+
+  剩余清单:
+  - 视频拍摄 (3-5 分钟, demo URL 上操作 dashboard 三个 scenario)
+  - 部署到 Render/Railway (FastAPI + Chroma + 静态 dashboard)
+  - 视频上传到 Loom/YouTube
+  - Ignyte 平台填表提交 (需要登录拿评分细则 + 提交格式规范)
+  - 注意:用户需要登录 Ignyte 后台拿评分细则与视频规格 (T9 仍 pending)
