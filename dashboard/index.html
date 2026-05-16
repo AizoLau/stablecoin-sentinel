@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HK Stablecoin Risk Sentinel</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-title">HK Stablecoin Risk Sentinel</div>
+      <div class="brand-subtitle">Unhosted-wallet AML/CFT enforcement on Arc Testnet</div>
+    </div>
+    <div class="status" id="status-bar">
+      <span class="status-dot" id="sse-dot" title="SSE connection"></span>
+      <span class="status-item">Chain: <code id="status-chain">—</code></span>
+      <span class="status-item">Sentinel: <code id="status-sentinel">—</code></span>
+      <span class="status-item">Records: <code id="status-count">—</code></span>
+    </div>
+  </header>
+
+  <section class="controls">
+    <button id="btn-trigger" class="primary">Trigger demo transfer (Alice → Bob, sanctioned)</button>
+    <button id="btn-refresh">Refresh history</button>
+    <label class="hint">
+      <input type="checkbox" id="opt-unfreeze" checked /> unfreeze recipient first (allow replay)
+    </label>
+  </section>
+
+  <main class="layout">
+    <aside class="feed">
+      <div class="section-title">Recent decisions</div>
+      <div id="feed-empty" class="empty">No decisions yet. Click <em>Trigger demo transfer</em>.</div>
+      <ul id="feed-list"></ul>
+    </aside>
+
+    <section class="detail" id="detail-pane">
+      <div class="empty large">Select a decision to inspect its agent reasoning and on-chain action.</div>
+    </section>
+  </main>
+
+  <footer class="marquee-citation">
+    <div class="marquee-title">Anchored on HKMA AML/CFT Guideline (August 2025) — Para 5.11:</div>
+    <blockquote>
+      “As the effectiveness of these risk mitigating measures is yet to be proven, the HKMA expects
+      licensees to adopt a cautious approach in determining whether their systems are adequate for
+      mitigating ML/TF risks associated with licensed stablecoin activities, in particular as
+      regards peer-to-peer transfers between unhosted wallets.”
+    </blockquote>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
