@@ -185,6 +185,83 @@ code, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; 
   color: var(--accent);
 }
 
+.paragraph-cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.paragraph-card {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0;
+}
+.paragraph-card.cited { border-left: 3px solid var(--accent); }
+.paragraph-card.unverified { border-left: 3px solid var(--freeze); }
+.paragraph-card summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.paragraph-card summary::-webkit-details-marker { display: none; }
+.paragraph-card .paragraph-body {
+  padding: 0 14px 12px 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: normal;
+}
+.doc-tag {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.sim-tag {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: ui-monospace, monospace;
+  margin-left: auto;
+}
+.badge-cited {
+  font-size: 10px;
+  background: var(--accent);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+}
+.badge-warn {
+  font-size: 11px;
+  color: var(--freeze);
+  font-weight: 600;
+}
+
+.retrieved-pool {
+  background: var(--panel-2);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 4px 0 16px;
+}
+.retrieved-pool summary {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  display: flex;
+  align-items: center;
+}
+.retrieved-pool summary::-webkit-details-marker { display: none; }
+.retrieved-pool[open] summary > span:last-child::after { content: "  ▼"; }
+.retrieved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.retrieved-list .paragraph-card.unused { opacity: 0.7; }
+
 .reasoning {
   background: var(--panel-2);
   border: 1px solid var(--border);

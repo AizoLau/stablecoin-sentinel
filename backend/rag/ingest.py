@@ -49,6 +49,7 @@ class Chunk:
     paragraph_id: str
     document: str
     text: str
+    section_heading: str = ""
 
 
 def clean_corpus(raw: str) -> str:
@@ -78,6 +79,48 @@ def chunk_by_paragraph(text: str, document: str, *, min_len: int = 80) -> list[C
                 paragraph_id=paragraph_id,
                 document=document,
                 text=body,
+            )
+        )
+    return chunks
+
+
+# Cap 656 layout: each page footer contains "Section N Cap. 656" (legal pagination).
+# We slice by PAGE markers and tag chunks with the section from the footer.
+PAGE_BOUNDARY = re.compile(r"=====\s*PAGE\s*(\d+)\s*=====", re.IGNORECASE)
+CAP656_SECTION = re.compile(r"Section\s+(\d+[A-Z]*)\s+Cap\.\s*656")
+
+
+def chunk_by_page(text: str, document: str, *, min_len: int = 200, max_chars: int = 2000) -> list[Chunk]:
+    """Slice text by PAGE markers, one chunk per page.
+
+    Used for Cap 656 where paragraph hierarchy is nested (Part/Division/Section/(1)(a)),
+    making per-paragraph chunking either too coarse (whole section) or too fragmented
+    (every sub-clause). Per-page chunks keep semantic locality + the page footer gives
+    us the canonical Section identifier.
+    """
+    parts = PAGE_BOUNDARY.split(text)
+    # parts = [pre, page_num_1, body_1, page_num_2, body_2, ...]
+    chunks: list[Chunk] = []
+    for i in range(1, len(parts), 2):
+        page_num = parts[i].strip()
+        body = parts[i + 1].strip() if i + 1 < len(parts) else ""
+        if not body:
+            continue
+        m = CAP656_SECTION.search(body)
+        section = m.group(1) if m else ""
+        body_clean = re.sub(r"\s+", " ", body).strip()
+        if len(body_clean) < min_len:
+            continue
+        if len(body_clean) > max_chars:
+            body_clean = body_clean[:max_chars] + " [...]"
+        paragraph_id = f"s{section}" if section else f"p{page_num}"
+        chunks.append(
+            Chunk(
+                chunk_id=f"{document}::p{page_num}",
+                paragraph_id=paragraph_id,
+                document=document,
+                text=body_clean,
+                section_heading=section,
             )
         )
     return chunks
@@ -123,16 +166,25 @@ def ingest(settings: Settings) -> dict[str, int]:
 
     results: dict[str, int] = {}
     corpus_files = [
-        (PROJECT_ROOT / "_extracted" / "aml_guideline.txt", "HKMA-AML-Guideline-2025-08"),
+        (
+            PROJECT_ROOT / "_extracted" / "aml_guideline.txt",
+            "HKMA-AML-Guideline-2025-08",
+            chunk_by_paragraph,
+        ),
+        (
+            PROJECT_ROOT / "_extracted" / "cap656.txt",
+            "Cap-656-Stablecoins-Ordinance-2025-08",
+            chunk_by_page,
+        ),
     ]
-    for path, document in corpus_files:
+    for path, document, chunker in corpus_files:
         if not path.exists():
             logger.warning("Corpus file missing, skipping: %s", path)
             continue
         raw = path.read_text(encoding="utf-8")
-        cleaned = clean_corpus(raw)
-        chunks = chunk_by_paragraph(cleaned, document)
-        logger.info("%s -> %d paragraph chunks", document, len(chunks))
+        cleaned = clean_corpus(raw) if chunker is chunk_by_paragraph else raw
+        chunks = chunker(cleaned, document)
+        logger.info("%s -> %d chunks", document, len(chunks))
         if not chunks:
             results[document] = 0
             continue
@@ -143,7 +195,11 @@ def ingest(settings: Settings) -> dict[str, int]:
             embeddings=embeddings,
             documents=[c.text for c in chunks],
             metadatas=[
-                {"paragraph_id": c.paragraph_id, "document": c.document}
+                {
+                    "paragraph_id": c.paragraph_id,
+                    "document": c.document,
+                    "section_heading": c.section_heading,
+                }
                 for c in chunks
             ],
         )

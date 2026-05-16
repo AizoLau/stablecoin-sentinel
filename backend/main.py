@@ -246,9 +246,9 @@ async def demo_trigger(body: DemoTriggerBody) -> dict:
         amount=body.amount,
     )
 
-    decision = await state.manager.decide(transfer)
+    decision, retrieved = await state.manager.decide(transfer)
     receipt = await state.executor.execute(decision)
-    record_id = state.audit.append(transfer, decision, receipt)
+    record_id = state.audit.append(transfer, decision, receipt, retrieved=retrieved)
 
     record = state.audit.list_recent(limit=1)[0]
     await _broadcast({"type": "decision", "record": record})

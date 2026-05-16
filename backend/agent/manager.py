@@ -106,7 +106,13 @@ class ManagerAgent:
         self._gemini = genai.Client(api_key=settings.gemini_api_key)
         self.model = settings.gemini_model_pro
 
-    async def decide(self, transfer: TransferEvent) -> Decision:
+    async def decide(self, transfer: TransferEvent) -> tuple[Decision, list[RetrievedChunk]]:
+        """Run the full agent loop and return both the decision and the RAG evidence.
+
+        Returning the retrieved chunks alongside the decision lets the caller persist
+        them in the audit log so the dashboard can later render the full text of every
+        paragraph the agent saw — not only the ones it chose to cite.
+        """
         from_profile = await self.debank.get_profile(transfer.from_address)
         to_profile = await self.debank.get_profile(transfer.to_address)
         from_hit = self.sanctions.lookup(transfer.from_address)
@@ -138,7 +144,7 @@ class ManagerAgent:
         if parsed is None:
             raise RuntimeError(f"Gemini did not return a parseable Decision: {resp.text!r}")
 
-        return Decision(
+        decision = Decision(
             transfer=transfer,
             action=Action(parsed.action),
             target_address=parsed.target_address,
@@ -146,6 +152,7 @@ class ManagerAgent:
             paragraphs_cited=parsed.paragraphs_cited,
             reasoning_md=parsed.reasoning_md,
         )
+        return decision, retrieved
 
     def _retrieve_paragraphs(
         self,

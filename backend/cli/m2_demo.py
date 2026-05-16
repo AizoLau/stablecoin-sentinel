@@ -108,9 +108,10 @@ async def run_demo(args: argparse.Namespace) -> int:
     retriever = HKMARetriever(s)
     manager = ManagerAgent(s, debank, sanctions, retriever)
     try:
-        decision = await manager.decide(event)
+        decision, retrieved = await manager.decide(event)
     finally:
         await debank.close()
+    print(f"  retrieved_chunks: {len(retrieved)} (from RAG)")
     print(f"  action:      {decision.action.value.upper()}")
     print(f"  target:      {decision.target_address}")
     print(f"  risk_score:  {decision.risk_score}")

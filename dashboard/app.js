@@ -103,6 +103,69 @@ function renderFeed() {
   }
 }
 
+function renderCitedParagraphs(rec) {
+  const retrieved = rec.retrieved_paragraphs || [];
+  const cited = new Set(rec.paragraphs_cited || []);
+  // Pair cited ids with their retrieved full-text (RAG evidence). If a cited id is not
+  // in the retrieved set, mark it as "unverified" — it would be a hallucination.
+  const citedFull = (rec.paragraphs_cited || []).map((pid) => {
+    const match = retrieved.find((r) => r.paragraph_id === pid);
+    return { pid, match };
+  });
+  if (!citedFull.length) {
+    return `<div class="empty">(no paragraphs cited)</div>`;
+  }
+  return citedFull.map(({ pid, match }) => {
+    if (!match) {
+      return `
+        <details class="paragraph-card unverified" open>
+          <summary>
+            <span class="paragraph-chip">Para ${escapeHtml(pid)}</span>
+            <span class="badge-warn">⚠ not in retrieved set — possible hallucination</span>
+          </summary>
+        </details>`;
+    }
+    return `
+      <details class="paragraph-card cited" open>
+        <summary>
+          <span class="paragraph-chip">Para ${escapeHtml(match.paragraph_id)}</span>
+          <span class="doc-tag">${escapeHtml(match.document)}</span>
+          <span class="sim-tag">similarity ${match.similarity.toFixed(3)}</span>
+        </summary>
+        <div class="paragraph-body">${escapeHtml(match.text)}</div>
+      </details>`;
+  }).join("");
+}
+
+function renderAllRetrieved(rec) {
+  const retrieved = rec.retrieved_paragraphs || [];
+  const cited = new Set(rec.paragraphs_cited || []);
+  if (!retrieved.length) return "";
+  return `
+    <details class="retrieved-pool">
+      <summary>
+        <span class="section-title" style="display:inline">All retrieved evidence (top ${retrieved.length})</span>
+        <span style="color:var(--muted); font-size:12px; margin-left:8px">▶ click to expand</span>
+      </summary>
+      <div class="retrieved-list">
+        ${retrieved.map((r) => {
+          const usedCls = cited.has(r.paragraph_id) ? "used" : "unused";
+          const usedBadge = cited.has(r.paragraph_id) ? '<span class="badge-cited">CITED</span>' : "";
+          return `
+            <details class="paragraph-card ${usedCls}">
+              <summary>
+                <span class="paragraph-chip">Para ${escapeHtml(r.paragraph_id)}</span>
+                <span class="doc-tag">${escapeHtml(r.document)}</span>
+                <span class="sim-tag">sim ${r.similarity.toFixed(3)}</span>
+                ${usedBadge}
+              </summary>
+              <div class="paragraph-body">${escapeHtml(r.text)}</div>
+            </details>`;
+        }).join("")}
+      </div>
+    </details>`;
+}
+
 function selectRecord(id) {
   state.selectedId = id;
   renderFeed();
@@ -139,12 +202,14 @@ function selectRecord(id) {
       <span class="mono">${rec.risk_score} / 100</span>
     </div>
 
-    <div class="section-title">HKMA paragraphs cited (retrieved, not hallucinated)</div>
-    <div class="paragraphs">
-      ${rec.paragraphs_cited.map((p) => `<span class="paragraph-chip">Para ${escapeHtml(p)}</span>`).join("") || "<span class='empty'>(none)</span>"}
+    <div class="section-title">HKMA paragraphs cited (retrieved from RAG, not hallucinated)</div>
+    <div class="paragraph-cards">
+      ${renderCitedParagraphs(rec)}
     </div>
 
-    <div class="section-title">Agent reasoning</div>
+    ${renderAllRetrieved(rec)}
+
+    <div class="section-title" style="margin-top:18px">Agent reasoning</div>
     <div class="reasoning">${escapeHtml(rec.reasoning_md)}</div>
 
     <div class="section-title">On-chain execution</div>

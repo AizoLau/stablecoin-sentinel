@@ -15,6 +15,7 @@ from pathlib import Path
 
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
+from backend.rag.retrieve import RetrievedChunk
 from backend.store.models import Action, Decision, ExecutionReceipt, TransferEvent
 
 logger = logging.getLogger(__name__)
@@ -36,9 +37,10 @@ class AuditRecord(SQLModel, table=True):
     target_address: str
     risk_score: int
     paragraphs_cited_json: str  # JSON-encoded list[str]
-    reasoning_md: str
+    retrieved_paragraphs_json: str = ""  # JSON list of {paragraph_id, document, text, similarity}
+    reasoning_md: str = ""
 
-    execution_status: str  # "confirmed" | "failed" | "skipped"
+    execution_status: str = ""  # "confirmed" | "failed" | "skipped"
     execution_tx_hash: str | None = None
     execution_error: str | None = None
 
@@ -46,6 +48,15 @@ class AuditRecord(SQLModel, table=True):
     def paragraphs_cited(self) -> list[str]:
         try:
             return json.loads(self.paragraphs_cited_json)
+        except json.JSONDecodeError:
+            return []
+
+    @property
+    def retrieved_paragraphs(self) -> list[dict]:
+        if not self.retrieved_paragraphs_json:
+            return []
+        try:
+            return json.loads(self.retrieved_paragraphs_json)
         except json.JSONDecodeError:
             return []
 
@@ -62,6 +73,7 @@ class AuditRecord(SQLModel, table=True):
             "target_address": self.target_address,
             "risk_score": self.risk_score,
             "paragraphs_cited": self.paragraphs_cited,
+            "retrieved_paragraphs": self.retrieved_paragraphs,
             "reasoning_md": self.reasoning_md,
             "execution_status": self.execution_status,
             "execution_tx_hash": self.execution_tx_hash,
@@ -80,7 +92,17 @@ class AuditLog:
         transfer: TransferEvent,
         decision: Decision,
         receipt: ExecutionReceipt,
+        retrieved: list[RetrievedChunk] | None = None,
     ) -> int:
+        retrieved_payload = [
+            {
+                "paragraph_id": r.paragraph_id,
+                "document": r.document,
+                "text": r.text,
+                "similarity": round(r.similarity, 4),
+            }
+            for r in (retrieved or [])
+        ]
         record = AuditRecord(
             tx_hash=transfer.tx_hash,
             block_number=transfer.block_number,
@@ -93,6 +115,7 @@ class AuditLog:
             target_address=decision.target_address,
             risk_score=decision.risk_score,
             paragraphs_cited_json=json.dumps(decision.paragraphs_cited),
+            retrieved_paragraphs_json=json.dumps(retrieved_payload),
             reasoning_md=decision.reasoning_md,
             execution_status=receipt.status,
             execution_tx_hash=receipt.tx_hash,
