@@ -41,3 +41,6 @@ Thumbs.db
 # Build artifacts
 dist/
 build/
+
+# Personal local checklist (kept out of public repo)
+NEXT_STEPS.md
